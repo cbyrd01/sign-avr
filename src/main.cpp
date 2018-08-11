@@ -40,6 +40,7 @@ void setup()
 
   // Pins for Gear
   pinMode(POWERTAILPIN, OUTPUT);
+  pinMode(13, OUTPUT);
   pinMode(REEDSWITCHPIN, INPUT_PULLUP);
 }
 
@@ -80,13 +81,14 @@ void doMarquee() {
 }
 
 void gearOn() {
-  gearStop = 0;
   digitalWrite(POWERTAILPIN, HIGH);
+  digitalWrite(13, HIGH);
 }
 
 
 void doGear(int turnOn) {
   if(turnOn) {
+    gearStop = 0;
     gearOn();
   }
   else {
@@ -120,6 +122,7 @@ void loop()
   if(gearStop == 1) {
     if(digitalRead(REEDSWITCHPIN) == LOW) {
       digitalWrite(POWERTAILPIN, LOW);
+      digitalWrite(13, LOW);
     }
   }
   else {
