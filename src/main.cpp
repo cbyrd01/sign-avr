@@ -1,83 +1,73 @@
-#include <Adafruit_NeoPixel.h>
+#include <Arduino.h> // Base Arduino
+#include <Wire.h> // Wire library for I2C
+#include <Adafruit_NeoPXL8.h> // Adafruit NeoPXL8 LED library
 
-// five strips, one each for F O R G E
-#define STARTPIN 6
-#define POWERTAILPIN 12
-#define REEDSWITCHPIN 11
+#define SLAVE_ADDRESS 0x08 // I2C slave address
+
+#define REEDSWITCHPIN 11 // Digitial input pin for sensing when to stop the gear
+#define POWERTAILPIN 12 // Digital output pin which controls the gear
 
 const int NUM_PIXELS  = 120; // 120 pixels per strip
 const int NUM_STRIPS  = 5;   // one strip per letter
 const int FULL_BRIGHT = 255; // 0-255
 const int OFF         = 0;   // 0-255
 
-// Letter O is one short pixels (oops), so we have to keep a list per letter
-int numLed[] = {NUM_PIXELS, NUM_PIXELS - 1, NUM_PIXELS, NUM_PIXELS, NUM_PIXELS};
-
-
-// We setup 5 strips, one for each letter.
-Adafruit_NeoPixel strip[NUM_STRIPS] = {
-  Adafruit_NeoPixel(numLed[0],STARTPIN, NEO_GRB + NEO_KHZ800),   // F
-  Adafruit_NeoPixel(numLed[1],STARTPIN+1, NEO_GRB + NEO_KHZ800), // O
-  Adafruit_NeoPixel(numLed[2],STARTPIN+2, NEO_GRB + NEO_KHZ800), // R
-  Adafruit_NeoPixel(numLed[3],STARTPIN+3, NEO_GRB + NEO_KHZ800), // G
-  Adafruit_NeoPixel(numLed[4],STARTPIN+4, NEO_GRB + NEO_KHZ800)  // E
+// Shared state variables
+int newCommand = 0; // flag if we get commands from I2C
+char command[3]; // store what we got from I2C
+int gearStop = 0;
+// Matrix to hold each LED strip and rgb values
+int stripMatrix[8][3] = {
+  {0,0,0},
+  {0,0,0},
+  {0,0,0},
+  {0,0,0},
+  {0,0,0},
+  {0,0,0},
+  {0,0,0},
+  {0,0,0}
 };
 
-// Serial variables
-char cmd = NULL;
-int curCharNum = 0;
-char valueList[7] = {};
-int gearStop = 0;
+// Set up the NeoPXL8 LEDs. Sixth pin has been changed from SDA to MOSI
+int8_t pins[8] = { PIN_SERIAL1_RX, PIN_SERIAL1_TX, MISO, 13, 5, MOSI, A4, A3 };
+Adafruit_NeoPXL8 leds(NUM_PIXELS, pins, NEO_GRB);
 
-void setup()
-{
-  // Start serial at 38400 baud
-  Serial.begin(19200);
-  for(int i=0; i<NUM_STRIPS;i++) {
-    strip[i].begin();
-    strip[i].setBrightness(FULL_BRIGHT);
+// The following function is called when I2C receives data
+// The slave doesn't ACK until this function returns
+// So it breaks stuff to spend too much time here
+void receiveData(int byteCount){
+  int receiveByte = 0; // set index to 0
+  while(Wire.available()) // loop through all incoming bytes
+  {
+   command[receiveByte] = Wire.read(); // receive byte as a character
+   receiveByte++; // increase index by 1
   }
-
-  // Pins for Gear
-  pinMode(POWERTAILPIN, OUTPUT);
-  pinMode(13, OUTPUT);
-  pinMode(REEDSWITCHPIN, INPUT_PULLUP);
+    Serial.print("Did you hear something? I saw: "); // Debugging to serial
+    Serial.println(String(command[0])); // Debugging to serial
+    newCommand = 1;
 }
 
-void setStripColor(int letterNumber, int redValue, int greenValue, int blueValue) {
-  for(int i=0; i<numLed[letterNumber]; i++) {
-    strip[letterNumber].setPixelColor(i, redValue, greenValue, blueValue);
+// The following function sets the LED strps to a specified RGB color
+void setStripColor(int stripNumber, int redValue, int greenValue, int blueValue) {
+  int startPixel = stripNumber*NUM_PIXELS;
+  for(int p=0+startPixel; p<startPixel+NUM_PIXELS; p++) {
+    leds.setPixelColor(p, redValue, greenValue, blueValue);
   }
-  strip[letterNumber].show();
+  leds.show();
 }
+
+// This function turns on all of the strips at full bright (white)
 void allOn() {
   for(int i=0; i<NUM_STRIPS;i++) {
     setStripColor(i, FULL_BRIGHT, FULL_BRIGHT, FULL_BRIGHT);  
   }
 }
 
+// This function turns off all of the strips at once
 void allOff() {
   for(int i=0; i<NUM_STRIPS;i++) {
     setStripColor(i, OFF, OFF, OFF);  
   }
-}
-
-void doFlash(int numTimes,int myDelay) {
- for(int i=0; i<numTimes;i++) {
-    allOn();
-    delay(myDelay);
-    allOff();
-    delay(myDelay);
-  }
-}
-
-
-void doMarquee() {
-  for(int i=0; i<NUM_STRIPS;i++) {
-   setStripColor(i, FULL_BRIGHT, FULL_BRIGHT, FULL_BRIGHT);  
-   delay(1000);
-  }
-  doFlash(3,500);
 }
 
 void gearOn() {
@@ -85,6 +75,12 @@ void gearOn() {
   digitalWrite(13, HIGH);
 }
 
+void gearOff() {
+    if(digitalRead(REEDSWITCHPIN) == LOW) {
+      digitalWrite(POWERTAILPIN, LOW);
+      digitalWrite(13, LOW);
+    }
+}
 
 void doGear(int turnOn) {
   if(turnOn) {
@@ -97,85 +93,35 @@ void doGear(int turnOn) {
   }
 }
 
-void runSpecial(int valType, int valueOne, int valueTwo, int valueThree) {
-  switch(valType)
-  {
-    case 0: doMarquee();break;
-    case 1: doGear(valueOne);break;
-    case 2: doFlash(10,500); break;
-    case 3: allOn(); break;
-    case 4: allOff(); break;
-  }
-}
+void setup()
+{
+  // Start serial at 9600 baud
+  Serial.begin(9600);
+  
+  // Set up NeoPXL8 LEDs
+  leds.begin();
+  leds.setBrightness(FULL_BRIGHT);
 
-void resetCommand() {
-  cmd = NULL;
-  curCharNum = 0;
-  for(int i=0; i<7;i++) {
-    valueList[i] = NULL;
-  }
-}
+  // Set up pins for Gear
+  pinMode(POWERTAILPIN, OUTPUT);
+  pinMode(13, OUTPUT);
+  pinMode(REEDSWITCHPIN, INPUT_PULLUP);
 
+ // Starting I2C slave
+  Wire.begin(SLAVE_ADDRESS);
+
+  // define callbacks for i2c communication
+  Wire.onReceive(receiveData);
+}
 
 void loop()
 {
   if(gearStop == 1) {
-    if(digitalRead(REEDSWITCHPIN) == LOW) {
-      digitalWrite(POWERTAILPIN, LOW);
-      digitalWrite(13, LOW);
-    }
+    gearOff();
   }
   else {
     gearOn();
   }
 
-  if(!Serial.available()) {
-    return;
-  }
-
-  char readChar = Serial.read(); 
-
-  // Reset whenever an end of command character ";" is read
-  if (readChar == ';') {
-    resetCommand();
-    return;
-  }
-
-  // First read a command, then a value.  If a command hasn't been read yet, 
-  // then read it and store for next iteration of the loop.
-  if (!cmd) {
-    cmd = readChar;
-  }
-  else {
-    valueList[curCharNum] = readChar;
-    // values are two characters, read the first character and store for next
-    // iteration of the loop if one hasn't already been read
-    if(curCharNum == 6) {
-
-      char mybuf [3];
-
-      sprintf(mybuf,"0%c",valueList[0]);
-      int lightNumber = strtol(mybuf,NULL,16);
-
-      sprintf(mybuf,"%c%c",valueList[1],valueList[2]);
-      int redValue = strtol(mybuf,NULL,16);
-
-      sprintf(mybuf,"%c%c",valueList[3],valueList[4]);
-      int greenValue = strtol(mybuf,NULL,16);
-
-      sprintf(mybuf,"%c%c",valueList[5],valueList[6]);
-      int blueValue = strtol(mybuf,NULL,16);
-
-      // After getting the command and value, determine what to execute
-      switch(cmd)
-      {
-        case 'c': setStripColor(lightNumber, redValue, greenValue, blueValue);break;
-        case 's': runSpecial(lightNumber, redValue, greenValue, blueValue); break;
-      }
-      // After running command, clear it before next iteration
-      resetCommand();
-    }
-    curCharNum++;
-  }
 }
 

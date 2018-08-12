@@ -1,12 +1,13 @@
 # Protocol for communicating to the Arduino over I2C
 I2C all communication is initiated by i2c-master (RPI/Node) to the i2c-slave (Arduino).
 
-This uses a three byte message:
+This uses a two byte message:
 
 |cmd|option|value|
 |---|------|-----|
+|4 bit|4 bit| 8 bit|
 
-For ease of troubleshooting, cmd and option are numeric digits 0-9. Value is a binary number from 0-255. All three bytes are always present (fixed length message), when not needed they are set to zero.
+Cmd and option are 4 bit integers from 0-15. Value is a 8 bit integer from 0-255. Two bytes are always present (fixed length message), when value is not needed it is set to zero.
 
 ## Commands
 
@@ -15,7 +16,7 @@ For ease of troubleshooting, cmd and option are numeric digits 0-9. Value is a b
 |0-7|Set first-eigth strand color|
 |8|Set gear|
 |9|Special mode|
-|0|future use|
+|10-15|future use|
 
 ## Options
 ### Command
@@ -67,9 +68,10 @@ When cmd is 9 (special mode) the value depends on the special mode used.
 
 |cmd|option|value|meaning|
 |---|------|-----|-------|
-|0|0|255|Set the first LED strand to red|
+|0|0|255|Set the first LED strand red to full intensity|
+|3|2|128|Set the fourth LED strand blue to half intensity|
 |8|0|0|Turn off the gear|
 |8|1|0|Turn on the gear|
-|9|0|0|All LED off|
-|9|1|0|All LED on|
+|9|0|0|All LED strips off|
+|9|1|0|All LED strips on full white|
 |9|2|100|Blink LED with 100ms transition|
