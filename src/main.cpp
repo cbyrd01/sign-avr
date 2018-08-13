@@ -1,21 +1,27 @@
-#include <Arduino.h> // Base Arduino
-#include <Wire.h> // Wire library for I2C
+#include <Arduino.h>          // Base Arduino
+#include <Wire.h>             // Wire library for I2C
 #include <Adafruit_NeoPXL8.h> // Adafruit NeoPXL8 LED library
 
-#define SLAVE_ADDRESS 0x08 // I2C slave address
+#define SLAVE_ADDRESS 0x08    // I2C slave address
 
-#define REEDSWITCHPIN 11 // Digitial input pin for sensing when to stop the gear
-#define POWERTAILPIN 12 // Digital output pin which controls the gear
+#define REEDSWITCHPIN 11      // Digitial input pin for sensing when to stop the gear
+#define POWERTAILPIN 12       // Digital output pin which controls the gear
 
-const int NUM_PIXELS  = 120; // 120 pixels per strip
-const int NUM_STRIPS  = 5;   // one strip per letter
-const int FULL_BRIGHT = 255; // 0-255
-const int OFF         = 0;   // 0-255
+const int NUM_PIXELS  = 120;  // 120 pixels per strip
+const int NUM_STRIPS  = 5;    // one strip per letter
+const int FULL_BRIGHT = 255;  // 0-255
+const int OFF         = 0;    // 0-255
+const int MAXGEARTIME = 30000; // Time in mills until the gear stops without seeing the reed switch
 
 // Shared state variables
-int newCommand = 0; // flag if we get commands from I2C
-char command[3]; // store what we got from I2C
-int gearStop = 0;
+int newCommandFlag = 0;       // flag if we get commands from I2C
+int ongoingEffectFlag = 0;    // flag if we need to process an ongoing lighting or gear effect
+int receivedCommand[2];       // store what we got from I2C
+int parsedCmd = 0;            // store the result of parsing the cmd from receivedCommand
+int parsedOption = 0;         // store the result of parsing the option from receivedCommand
+int parsedValue = 0;          // store the result of parsing the value from receivedCommand
+int stopGearFlag = 0;         // flag that we want to stop the gear from turning
+unsigned long currentMillis = millis();
 // Matrix to hold each LED strip and rgb values
 int stripMatrix[8][3] = {
   {0,0,0},
@@ -36,15 +42,13 @@ Adafruit_NeoPXL8 leds(NUM_PIXELS, pins, NEO_GRB);
 // The slave doesn't ACK until this function returns
 // So it breaks stuff to spend too much time here
 void receiveData(int byteCount){
-  int receiveByte = 0; // set index to 0
-  while(Wire.available()) // loop through all incoming bytes
+  int receiveByte = 0;        // set index to 0
+  while(Wire.available())     // loop through all incoming bytes
   {
-   command[receiveByte] = Wire.read(); // receive byte as a character
-   receiveByte++; // increase index by 1
+   receivedCommand[receiveByte] = Wire.read(); // receive byte as a character
+   receiveByte++;             // increase index by 1
   }
-    Serial.print("Did you hear something? I saw: "); // Debugging to serial
-    Serial.println(String(command[0])); // Debugging to serial
-    newCommand = 1;
+    newCommandFlag = 1;
 }
 
 // The following function sets the LED strps to a specified RGB color
@@ -84,12 +88,12 @@ void gearOff() {
 
 void doGear(int turnOn) {
   if(turnOn) {
-    gearStop = 0;
+    stopGearFlag = 0;
     gearOn();
   }
   else {
     // turn off
-    gearStop = 1;
+    stopGearFlag = 1;
   }
 }
 
@@ -116,12 +120,17 @@ void setup()
 
 void loop()
 {
-  if(gearStop == 1) {
-    gearOff();
-  }
-  else {
-    gearOn();
+  // Check for new commands
+  if (newCommandFlag) {
+    // Do stuff
   }
 
+  // Run ongoing effects
+  if (stopGearFlag) {
+    // Do stuff
+  }
+
+  if (ongoingEffectFlag) {
+    // Do stuff
+  }
 }
-
