@@ -16,7 +16,7 @@ const int MAXGEARTIME = 30000; // Time in mills until the gear stops without see
 // Shared state variables
 int newCommandFlag = 0;       // flag if we get commands from I2C
 int ongoingEffectFlag = 0;    // flag if we need to process an ongoing lighting or gear effect
-int receivedCommand[2];       // store what we got from I2C
+byte receivedCommand[2];       // store what we got from I2C
 int parsedCmd = 0;            // store the result of parsing the cmd from receivedCommand
 int parsedOption = 0;         // store the result of parsing the option from receivedCommand
 int parsedValue = 0;          // store the result of parsing the value from receivedCommand
@@ -122,7 +122,7 @@ void loop()
 {
   // Check for new commands
   if (newCommandFlag) {
-    // Do stuff
+    parsedCmd = receivedCommand[0] << 4;
   }
 
   // Run ongoing effects
