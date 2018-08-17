@@ -1,26 +1,31 @@
-#include <Arduino.h>          // Base Arduino
-#include <Wire.h>             // Wire library for I2C
-#include <Adafruit_NeoPXL8.h> // Adafruit NeoPXL8 LED library
+//
+// Arduino code for Inventor Forge Makerspace sign. Hardware is an Adafruit M0 Feather Express with a NeoPXL8 FeatherWing
+// to control the Adafruit NeoPixel strips. There are five strips, one each for the sign letters F O R G E. The protocol
+// is defined in PROTOCOL.md
 
-#define SLAVE_ADDRESS 0x08    // I2C slave address
+#include <Arduino.h>           // Base Arduino
+#include <Wire.h>              // Wire library for I2C
+#include <Adafruit_NeoPXL8.h>  // Adafruit NeoPXL8 LED library
 
-#define REEDSWITCHPIN 11      // Digitial input pin for sensing when to stop the gear
-#define POWERTAILPIN 12       // Digital output pin which controls the gear
+#define SLAVE_ADDRESS 0x08     // I2C slave address
 
-const int NUM_PIXELS  = 120;  // 120 pixels per strip
-const int NUM_STRIPS  = 5;    // one strip per letter
-const int FULL_BRIGHT = 255;  // 0-255
-const int OFF         = 0;    // 0-255
+#define REEDSWITCHPIN 11       // Digitial input pin for sensing when to stop the gear
+#define POWERTAILPIN 12        // Digital output pin which controls the gear
+
+const int NUM_PIXELS  = 120;   // 120 pixels per strip
+const int NUM_STRIPS  = 5;     // one strip per letter
+const int FULL_BRIGHT = 255;   // 0-255
+const int OFF         = 0;     // 0-255
 const int MAXGEARTIME = 30000; // Time in mills until the gear stops without seeing the reed switch
 
 // Shared state variables
-int newCommandFlag = 0;       // flag if we get commands from I2C
-int ongoingEffectFlag = 0;    // flag if we need to process an ongoing lighting or gear effect
+int newCommandFlag = 0;        // flag if we get commands from I2C
+int ongoingEffectFlag = 0;     // flag if we need to process an ongoing lighting or gear effect
 byte receivedCommand[2];       // store what we got from I2C
-int parsedCmd = 0;            // store the result of parsing the cmd from receivedCommand
-int parsedOption = 0;         // store the result of parsing the option from receivedCommand
-int parsedValue = 0;          // store the result of parsing the value from receivedCommand
-int stopGearFlag = 0;         // flag that we want to stop the gear from turning
+int parsedCmd = 0;             // store the result of parsing the cmd from receivedCommand
+int parsedOption = 0;          // store the result of parsing the option from receivedCommand
+int parsedValue = 0;           // store the result of parsing the value from receivedCommand
+int stopGearFlag = 0;          // flag that we want to stop the gear from turning
 unsigned long currentMillis = millis();
 // Matrix to hold each LED strip and rgb values
 int stripMatrix[8][3] = {
@@ -86,17 +91,6 @@ void gearOff() {
     }
 }
 
-void doGear(int turnOn) {
-  if(turnOn) {
-    stopGearFlag = 0;
-    gearOn();
-  }
-  else {
-    // turn off
-    stopGearFlag = 1;
-  }
-}
-
 void setup()
 {
   // Start serial at 9600 baud
@@ -106,7 +100,7 @@ void setup()
   leds.begin();
   leds.setBrightness(FULL_BRIGHT);
 
-  // Set up pins for Gear
+  // Set up pins for gear
   pinMode(POWERTAILPIN, OUTPUT);
   pinMode(13, OUTPUT);
   pinMode(REEDSWITCHPIN, INPUT_PULLUP);
@@ -122,12 +116,43 @@ void loop()
 {
   // Check for new commands
   if (newCommandFlag) {
+    // parse the parts of the received command
     parsedCmd = receivedCommand[0] << 4;
+    parsedOption = receivedCommand[0] >> 4;
+    parsedValue = receivedCommand[1];
+    // decide what to do with the new command
+    if (parsedCmd < 8) {
+      // cmd 0-7 means an update to an LED strip
+      stripMatrix[parsedCmd][parsedOption] = parsedValue;
+      setStripColor(parsedCmd, stripMatrix[parsedCmd][0],stripMatrix[parsedCmd][1],stripMatrix[parsedCmd][2]);
+    }
+    else if (parsedCmd == 8) {
+      // cmd 8 means an update to gear mode
+      if (parsedOption == 0) {
+        // stop the gear
+        stopGearFlag = 1;
+      }
+      else if (parsedOption == 1) {
+        // start the gear
+        stopGearFlag = 0;
+        gearOn();
+      }
+      else {
+        // do something with error or ignore
+      }
+    }
+    else if (parsedCmd = 9) {
+      // cmd 9 means a special command
+      // Special stuff here
+    }
+    else {
+      // do something with error or ignore
+    }
   }
 
   // Run ongoing effects
   if (stopGearFlag) {
-    // Do stuff
+    gearOff();
   }
 
   if (ongoingEffectFlag) {

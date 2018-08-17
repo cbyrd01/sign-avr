@@ -1,5 +1,5 @@
 # sign-avr
-Arduino code for Inventor Forge sign.
+Arduino code for Inventor Forge sign. The Arduino (an Adafruit M0 Feather Express is connected to a Raspberry Pi running Node.js. The protocol is defined in [the protocol document](PROTOCOL.md). The Adafruit M0 Feather Express is connected to a NeoPXL8 FeatherWing that controls each NeoPixel strip.
 
 ## Installation
 
@@ -9,8 +9,9 @@ Arduino code for Inventor Forge sign.
    tools](http://docs.platformio.org/en/stable/userguide/index.html)
 
 # TODO
-Make changes to support NeoPXL8 library
-Simplify command structure
-Replace serial with I2C
+Replace existing special modes (all on, all off)
+Look into using interrupt for POWERTAIL PIN to shut off gear.
+Add max timer to gear shutoff for error condition
+Look into verifying received command before processing
 Fix serial for monitor/debug
 Add new modes
