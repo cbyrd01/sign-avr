@@ -30,14 +30,27 @@ int stopGearFlag = 0;          // flag that we want to stop the gear from turnin
 unsigned long currentMillis = millis();
 // Matrix to hold each LED strip and rgb values
 int stripMatrix[8][3] = {
-  {0,0,0},
-  {0,0,0},
-  {0,0,0},
-  {0,0,0},
-  {0,0,0},
-  {0,0,0},
-  {0,0,0},
-  {0,0,0}
+  {0,0,0}, // F
+  {0,0,0}, // O
+  {0,0,0}, // R
+  {0,0,0}, // G
+  {0,0,0}, // E
+  {0,0,0}, // future use
+  {0,0,0}, // future use
+  {0,0,0}  // future use
+};
+// Matrix to hold preset color rgb values
+int colorMatrix[10][3] = {
+  {0,0,0},       // black (off)
+  {255,255,255}, // white (on)
+  {255,0,0},     // red
+  {0,255,0},     // green
+  {0,0,255},     // blue
+  {245,130,48},  // orange
+  {255,225,25},  // yellow
+  {70,240,240},  // cyan
+  {250,190,190}, // pink
+  {145,30,180}   // purple
 };
 
 // Set up the NeoPXL8 LEDs. Sixth pin has been changed from SDA to MOSI
@@ -125,8 +138,46 @@ void loop()
       setStripColor(parsedCmd, stripMatrix[parsedCmd][0],stripMatrix[parsedCmd][1],stripMatrix[parsedCmd][2]);
       leds.show();
     }
-    else if (parsedCmd == 8) {
-      // cmd 8 means an update to gear mode
+    else if (parsedCmd = 8) {
+      // cmd 8 means a lighting effect
+      if (parsedOption == 0) {
+        // all effects OFF
+        // TODO
+      }
+      else if (parsedOption == 1) {
+        // all LEDs to a preset color
+        for(int s=0; s<NUM_STRIPS; s++){
+          for(int c=0; c<3; c++) {
+          stripMatrix[s][c] = colorMatrix[parsedValue][c];
+          }
+        }
+        setAllStripColor(colorMatrix[parsedValue][0], colorMatrix[parsedValue][1], colorMatrix[parsedValue][2]);
+        leds.show();
+      }
+      else if (parsedOption == 2) {
+        // enable "Breathing" effect
+      }
+      else if (parsedOption == 3) {
+        // enable "Fire" effect
+      }
+      else if (parsedOption == 4) {
+        // enable "Build" effect
+      }
+      else if (parsedOption == 5) {
+        // enable "Rotate" effect
+      }
+      else if (parsedOption == 6) {
+        // enable "Rainbow" effect
+      }     
+      else if (parsedOption == 7) {
+        // enable "Bounce" effect
+      }    
+      else {
+        // do something with error or ignore
+      }
+    }
+        else if (parsedCmd == 9) {
+      // cmd 9 means an update to gear mode
       if (parsedOption == 0) {
         // stop the gear
         stopGearFlag = 1;
@@ -140,45 +191,17 @@ void loop()
         // do something with error or ignore
       }
     }
-    else if (parsedCmd = 9) {
-      // cmd 9 means a special command
-      if (parsedOption == 0) {
-        // all LEDs off
-        for(int s=0; s<NUM_STRIPS; s++){
-          for(int p=0; p<NUM_PIXELS; p++) {
-          stripMatrix[s][p] = OFF;
-          }
-        }
-        setAllStripColor(OFF, OFF, OFF);
-        leds.show();
-      }
-      else if (parsedOption == 1) {
-        // all LEDs on
-        for(int s=0; s<NUM_STRIPS; s++){
-          for(int p=0; p<NUM_PIXELS; p++) {
-          stripMatrix[s][p] = FULL_BRIGHT;
-          }
-        }
-        setAllStripColor(FULL_BRIGHT, FULL_BRIGHT, FULL_BRIGHT);
-        leds.show();
-      }
-      else if (parsedOption == 2) {
-        // blink LEDs
-      }
-      else {
-        // do something with error or ignore
-      }
-    }
     else {
       // do something with error or ignore
     }
   }
 
-  // Run ongoing effects
+  // Check to see if its time to stop the gear
   if (stopGearFlag) {
     gearOff();
   }
 
+  // Run ongoing effects
   if (ongoingEffectFlag) {
     // Do stuff
   }
