@@ -13,9 +13,10 @@
 #define POWERTAILPIN 12        // Digital output pin which controls the gear
 
 const int NUM_PIXELS  = 120;   // 120 pixels per strip
-const int NUM_STRIPS  = 5;     // one strip per letter
+const int NUM_STRIPS  = 8;     // one strip per letter, NeoPXL8 has max of 8 strips, extras are ignored
 const int FULL_BRIGHT = 255;   // 0-255
 const int OFF         = 0;     // 0-255
+const int BRIGHTNESS = 255;    // Set strip brightness
 const int MAXGEARTIME = 30000; // Time in mills until the gear stops without seeing the reed switch
 
 // Shared state variables
@@ -56,26 +57,23 @@ void receiveData(int byteCount){
     newCommandFlag = 1;
 }
 
-// The following function sets the LED strps to a specified RGB color
+// The following function sets the LED strips to a specified RGB color
 void setStripColor(int stripNumber, int redValue, int greenValue, int blueValue) {
+  // NeoPXL8 treats all strips as a single long strip. Find the starting pixel for the virtual "strip"
   int startPixel = stripNumber*NUM_PIXELS;
-  for(int p=0+startPixel; p<startPixel+NUM_PIXELS; p++) {
+  // Iterate through all individual pixels on the strip
+  for(int p=startPixel; p<startPixel+NUM_PIXELS; p++) {
+    // Set the strip to the specified values
     leds.setPixelColor(p, redValue, greenValue, blueValue);
   }
-  leds.show();
 }
 
-// This function turns on all of the strips at full bright (white)
-void allOn() {
-  for(int i=0; i<NUM_STRIPS;i++) {
-    setStripColor(i, FULL_BRIGHT, FULL_BRIGHT, FULL_BRIGHT);  
-  }
-}
-
-// This function turns off all of the strips at once
-void allOff() {
-  for(int i=0; i<NUM_STRIPS;i++) {
-    setStripColor(i, OFF, OFF, OFF);  
+// The following function sets all LED strips to a specified RGB color
+void setAllStripColor(int redValue, int greenValue, int blueValue) {
+  // Iterate through all LED strips
+   for(int s=0; s<NUM_STRIPS; s++) {
+     // Set the strip to the specified values
+    setStripColor(s, redValue, greenValue, blueValue);
   }
 }
 
@@ -98,7 +96,7 @@ void setup()
   
   // Set up NeoPXL8 LEDs
   leds.begin();
-  leds.setBrightness(FULL_BRIGHT);
+  leds.setBrightness(BRIGHTNESS);
 
   // Set up pins for gear
   pinMode(POWERTAILPIN, OUTPUT);
@@ -125,6 +123,7 @@ void loop()
       // cmd 0-7 means an update to an LED strip
       stripMatrix[parsedCmd][parsedOption] = parsedValue;
       setStripColor(parsedCmd, stripMatrix[parsedCmd][0],stripMatrix[parsedCmd][1],stripMatrix[parsedCmd][2]);
+      leds.show();
     }
     else if (parsedCmd == 8) {
       // cmd 8 means an update to gear mode
@@ -143,7 +142,32 @@ void loop()
     }
     else if (parsedCmd = 9) {
       // cmd 9 means a special command
-      // Special stuff here
+      if (parsedOption == 0) {
+        // all LEDs off
+        for(int s=0; s<NUM_STRIPS; s++){
+          for(int p=0; p<NUM_PIXELS; p++) {
+          stripMatrix[s][p] = OFF;
+          }
+        }
+        setAllStripColor(OFF, OFF, OFF);
+        leds.show();
+      }
+      else if (parsedOption == 1) {
+        // all LEDs on
+        for(int s=0; s<NUM_STRIPS; s++){
+          for(int p=0; p<NUM_PIXELS; p++) {
+          stripMatrix[s][p] = FULL_BRIGHT;
+          }
+        }
+        setAllStripColor(FULL_BRIGHT, FULL_BRIGHT, FULL_BRIGHT);
+        leds.show();
+      }
+      else if (parsedOption == 2) {
+        // blink LEDs
+      }
+      else {
+        // do something with error or ignore
+      }
     }
     else {
       // do something with error or ignore
