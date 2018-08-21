@@ -9,9 +9,6 @@ Arduino code for Inventor Forge sign. The Arduino (an Adafruit M0 Feather Expres
    tools](http://docs.platformio.org/en/stable/userguide/index.html)
 
 # TODO
-Replace existing special modes (all on, all off)
-Look into using interrupt for POWERTAIL PIN to shut off gear.
-Add max timer to gear shutoff for error condition
-Look into verifying received command before processing
-Fix serial for monitor/debug
-Add new modes
+1. Look into verifying received command before processing
+1. Fix serial for monitor/debug
+1. Add new modes
