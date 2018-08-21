@@ -14,10 +14,10 @@
 
 const int NUM_PIXELS  = 120;   // 120 pixels per strip
 const int NUM_STRIPS  = 8;     // one strip per letter, NeoPXL8 has max of 8 strips, extras are ignored
-const int FULL_BRIGHT = 255;   // 0-255
-const int OFF         = 0;     // 0-255
-const int BRIGHTNESS = 255;    // Set strip brightness
-const int MAXGEARTIME = 30000; // Time in mills until the gear stops without seeing the reed switch
+const int FULL_BRIGHT = 255;   // Basic constant for full intensity (0-255)
+const int OFF         = 0;     // Basic constant for off (0-255)
+const int BRIGHTNESS = 255;    // Set strip brightness (0-255)
+const int MAXGEARTIME = 60000; // Time in mills until the gear stops without seeing the reed switch
 
 // Shared state variables
 int newCommandFlag = 0;        // flag if we get commands from I2C
@@ -27,7 +27,7 @@ int parsedCmd = 0;             // store the result of parsing the cmd from recei
 int parsedOption = 0;          // store the result of parsing the option from receivedCommand
 int parsedValue = 0;           // store the result of parsing the value from receivedCommand
 int stopGearFlag = 0;          // flag that we want to stop the gear from turning
-unsigned long currentMillis = millis();
+unsigned long timerStart = millis();
 // Matrix to hold each LED strip and rgb values
 int stripMatrix[8][3] = {
   {0,0,0}, // F
@@ -92,14 +92,10 @@ void setAllStripColor(int redValue, int greenValue, int blueValue) {
 
 void gearOn() {
   digitalWrite(POWERTAILPIN, HIGH);
-  digitalWrite(13, HIGH);
 }
 
 void gearOff() {
-    if(digitalRead(REEDSWITCHPIN) == LOW) {
-      digitalWrite(POWERTAILPIN, LOW);
-      digitalWrite(13, LOW);
-    }
+    digitalWrite(POWERTAILPIN, LOW);
 }
 
 void setup()
@@ -113,7 +109,6 @@ void setup()
 
   // Set up pins for gear
   pinMode(POWERTAILPIN, OUTPUT);
-  pinMode(13, OUTPUT);
   pinMode(REEDSWITCHPIN, INPUT_PULLUP);
 
  // Starting I2C slave
@@ -132,20 +127,16 @@ void loop()
     parsedOption = receivedCommand[0] >> 4;
     parsedValue = receivedCommand[1];
     // decide what to do with the new command
-    if (parsedCmd < 8) {
-      // cmd 0-7 means an update to an LED strip
+    if (parsedCmd < 8) { // cmd 0-7 means an update to an LED strip
       stripMatrix[parsedCmd][parsedOption] = parsedValue;
       setStripColor(parsedCmd, stripMatrix[parsedCmd][0],stripMatrix[parsedCmd][1],stripMatrix[parsedCmd][2]);
       leds.show();
     }
-    else if (parsedCmd = 8) {
-      // cmd 8 means a lighting effect
-      if (parsedOption == 0) {
-        // all effects OFF
+    else if (parsedCmd == 8) { // cmd 8 means a lighting effect
+      if (parsedOption == 0) { // all effects OFF
         // TODO
       }
-      else if (parsedOption == 1) {
-        // all LEDs to a preset color
+      else if (parsedOption == 1) { // all LEDs to a preset color
         for(int s=0; s<NUM_STRIPS; s++){
           for(int c=0; c<3; c++) {
           stripMatrix[s][c] = colorMatrix[parsedValue][c];
@@ -154,37 +145,41 @@ void loop()
         setAllStripColor(colorMatrix[parsedValue][0], colorMatrix[parsedValue][1], colorMatrix[parsedValue][2]);
         leds.show();
       }
-      else if (parsedOption == 2) {
-        // enable "Breathing" effect
+      else if (parsedOption == 2) { // "Breathing" effect
+        // TODO
       }
-      else if (parsedOption == 3) {
-        // enable "Fire" effect
+      else if (parsedOption == 3) { // "Fire" effect
+        // TODO
       }
-      else if (parsedOption == 4) {
-        // enable "Build" effect
+      else if (parsedOption == 4) { // "Build" effect
+        // TODO
       }
-      else if (parsedOption == 5) {
-        // enable "Rotate" effect
+      else if (parsedOption == 5) { // "Rotate" effect
+        // TODO
       }
-      else if (parsedOption == 6) {
-        // enable "Rainbow" effect
+      else if (parsedOption == 6) { // "Rainbow" effect
+        // TODO
       }     
-      else if (parsedOption == 7) {
-        // enable "Bounce" effect
-      }    
+      else if (parsedOption == 7) { // "Bounce" effect
+        // TODO
+      }     
       else {
         // do something with error or ignore
       }
     }
-        else if (parsedCmd == 9) {
-      // cmd 9 means an update to gear mode
-      if (parsedOption == 0) {
-        // stop the gear
+        else if (parsedCmd == 9) { // update to gear mode
+
+      if (parsedOption == 0) { // stop the gear
         stopGearFlag = 1;
+        // Start the failsafe timer
+        timerStart = millis();
+        // Add an interrupt to stop the gear if POWERTAILPIN changes
+        attachInterrupt(REEDSWITCHPIN, gearOff, FALLING);
       }
-      else if (parsedOption == 1) {
-        // start the gear
+      else if (parsedOption == 1) { // start the gear
         stopGearFlag = 0;
+        // Remove the interrupt on the reed switch pin
+        detachInterrupt(REEDSWITCHPIN); 
         gearOn();
       }
       else {
@@ -197,12 +192,13 @@ void loop()
   }
 
   // Check to see if its time to stop the gear
-  if (stopGearFlag) {
+  if (stopGearFlag && millis() - timerStart >= MAXGEARTIME) {
+    detachInterrupt(REEDSWITCHPIN); 
     gearOff();
   }
-
+ 
   // Run ongoing effects
   if (ongoingEffectFlag) {
-    // Do stuff
+    // TODO
   }
 }
