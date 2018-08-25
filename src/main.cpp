@@ -19,6 +19,7 @@ const int BRIGHTNESS = 255;    // Set strip brightness (0-255)
 const int MAXGEARTIME = 60000; // Time in mills until the gear stops without seeing the reed switch
 
 const int BOUNCEDELAY = 1000;  // Time in mills for each change on the bounce effect
+const int ROTATEDELAY = 1000;  // Time in mills for each change on the rotate effect
 
 // Shared state variables
 int newCommandFlag = 0;        // flag if we get commands from I2C
@@ -216,8 +217,21 @@ void loop()
       else if (effectNum == 3) { // "Fire" effect
         // TODO
       }
-      else if (effectNum == 4) { // "Rotate" effect
-        // TODO
+      else if ((effectNum == 4)&& (millis() - effectTimer >= ROTATEDELAY)) { // "Rotate" effect
+        for(int s=0; s<NUM_STRIPS; s++) {
+           for(int c=0; c<3; c++) {
+             stripMatrix[s][c] = preEffectMatrix[s+(effectVarOne % NUM_STRIPS)][c];
+           }
+        }
+        // display the color
+        setAllStripColor();
+        leds.show();
+        if (effectVarOne < NUM_STRIPS) {
+          effectVarOne++;
+        }
+        else {
+          effectVarOne = 0;
+        }
       }
       else if (effectNum == 5) { // "Rainbow" effect
         // TODO
