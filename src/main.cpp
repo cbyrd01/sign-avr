@@ -19,6 +19,8 @@ const int OFF         = 0;     // Basic constant for off (0-255)
 const int BRIGHTNESS = 255;    // Set strip brightness (0-255)
 const int MAXGEARTIME = 60000; // Time in mills until the gear stops without seeing the reed switch
 
+const int BOUNCEDELAY = 1000;  // Time in mills for each change on the bounce effect
+
 // Shared state variables
 int newCommandFlag = 0;        // flag if we get commands from I2C
 int ongoingEffectFlag = 0;     // flag if we need to process an ongoing lighting or gear effect
@@ -27,9 +29,20 @@ int parsedCmd = 0;             // store the result of parsing the cmd from recei
 int parsedOption = 0;          // store the result of parsing the option from receivedCommand
 int parsedValue = 0;           // store the result of parsing the value from receivedCommand
 int stopGearFlag = 0;          // flag that we want to stop the gear from turning
-unsigned long timerStart = millis();
+unsigned long gearTimer = millis();
 // Matrix to hold each LED strip and rgb values
 int stripMatrix[8][3] = {
+  {0,0,0}, // F
+  {0,0,0}, // O
+  {0,0,0}, // R
+  {0,0,0}, // G
+  {0,0,0}, // E
+  {0,0,0}, // future use
+  {0,0,0}, // future use
+  {0,0,0}  // future use
+};
+// Matrix to hold each LED strip state before ongoing effects
+int preEffectMatrix[8][3] = {
   {0,0,0}, // F
   {0,0,0}, // O
   {0,0,0}, // R
@@ -52,6 +65,10 @@ int colorMatrix[10][3] = {
   {250,190,190}, // pink
   {145,30,180}   // purple
 };
+int effectNum = 0; // Which ongoing effect is active
+int effectVarOne = 0; // first variable for running effects
+int effectVarTwo = 0; // second variable for running effects
+unsigned long effectTimer = millis(); // variable to hold effect timer
 
 // Set up the NeoPXL8 LEDs. Sixth pin has been changed from SDA to MOSI
 int8_t pins[8] = { PIN_SERIAL1_RX, PIN_SERIAL1_TX, MISO, 13, 5, MOSI, A4, A3 };
@@ -70,23 +87,23 @@ void receiveData(int byteCount){
     newCommandFlag = 1;
 }
 
-// The following function sets the LED strips to a specified RGB color
-void setStripColor(int stripNumber, int redValue, int greenValue, int blueValue) {
+// The following function sets the LED strips to the stored RGB color
+void setStripColor(int stripNumber) {
   // NeoPXL8 treats all strips as a single long strip. Find the starting pixel for the virtual "strip"
   int startPixel = stripNumber*NUM_PIXELS;
   // Iterate through all individual pixels on the strip
   for(int p=startPixel; p<startPixel+NUM_PIXELS; p++) {
     // Set the strip to the specified values
-    leds.setPixelColor(p, redValue, greenValue, blueValue);
+    leds.setPixelColor(p, stripMatrix[stripNumber][0], stripMatrix[stripNumber][0], stripMatrix[stripNumber][0]);
   }
 }
 
 // The following function sets all LED strips to a specified RGB color
-void setAllStripColor(int redValue, int greenValue, int blueValue) {
+void setAllStripColor() {
   // Iterate through all LED strips
    for(int s=0; s<NUM_STRIPS; s++) {
-     // Set the strip to the specified values
-    setStripColor(s, redValue, greenValue, blueValue);
+     // Set the strip to the stored values
+    setStripColor(s);
   }
 }
 
@@ -129,12 +146,14 @@ void loop()
     // decide what to do with the new command
     if (parsedCmd < 8) { // cmd 0-7 means an update to an LED strip
       stripMatrix[parsedCmd][parsedOption] = parsedValue;
-      setStripColor(parsedCmd, stripMatrix[parsedCmd][0],stripMatrix[parsedCmd][1],stripMatrix[parsedCmd][2]);
+      setStripColor(parsedCmd);
       leds.show();
     }
     else if (parsedCmd == 8) { // cmd 8 means a lighting effect
-      if (parsedOption == 0) { // all effects OFF
-        // TODO
+      if (parsedOption == 0) { // stop ongoing effects
+        ongoingEffectFlag = 0;
+        setAllStripColor();
+        leds.show();
       }
       else if (parsedOption == 1) { // all LEDs to a preset color
         for(int s=0; s<NUM_STRIPS; s++){
@@ -142,29 +161,24 @@ void loop()
           stripMatrix[s][c] = colorMatrix[parsedValue][c];
           }
         }
-        setAllStripColor(colorMatrix[parsedValue][0], colorMatrix[parsedValue][1], colorMatrix[parsedValue][2]);
+        setAllStripColor();
         leds.show();
       }
-      else if (parsedOption == 2) { // "Breathing" effect
-        // TODO
-      }
-      else if (parsedOption == 3) { // "Fire" effect
-        // TODO
-      }
-      else if (parsedOption == 4) { // "Build" effect
-        // TODO
-      }
-      else if (parsedOption == 5) { // "Rotate" effect
-        // TODO
-      }
-      else if (parsedOption == 6) { // "Rainbow" effect
-        // TODO
-      }     
-      else if (parsedOption == 7) { // "Bounce" effect
-        // TODO
-      }     
-      else {
-        // do something with error or ignore
+      if (parsedOption >= 2 && parsedOption <= 6) { // Special effects
+        ongoingEffectFlag = 1;
+        // Store the parsedOption in effect number. We don't just use parsedOption because it can change mid cycle
+        effectNum = parsedOption;
+        // Set the effect timer to zero for the first pass
+        effectTimer = 0;
+        // reset the effect matrix to match the current led matrix
+        for(int i=0; i<8; i++) {
+          for(int j=0; j<3; j++) {
+            preEffectMatrix[i][j] = stripMatrix[i][j];
+          }
+        }
+        // reset the effect variables for all effects
+        effectVarOne = 0;
+        effectVarTwo = 0;
       }
     }
         else if (parsedCmd == 9) { // update to gear mode
@@ -172,7 +186,7 @@ void loop()
       if (parsedOption == 0) { // stop the gear
         stopGearFlag = 1;
         // Start the failsafe timer
-        timerStart = millis();
+        gearTimer = millis();
         // Add an interrupt to stop the gear if POWERTAILPIN changes
         attachInterrupt(REEDSWITCHPIN, gearOff, FALLING);
       }
@@ -192,13 +206,52 @@ void loop()
   }
 
   // Check to see if its time to stop the gear
-  if (stopGearFlag && millis() - timerStart >= MAXGEARTIME) {
+  if (stopGearFlag && millis() - gearTimer >= MAXGEARTIME) {
     detachInterrupt(REEDSWITCHPIN); 
     gearOff();
   }
  
-  // Run ongoing effects
-  if (ongoingEffectFlag) {
-    // TODO
+  if (ongoingEffectFlag) {    // Run ongoing effects
+      if (effectNum == 2) { // "Breathing" effect
+        // TODO
+      }
+      else if (effectNum == 3) { // "Fire" effect
+        // TODO
+      }
+      else if (effectNum == 4) { // "Rotate" effect
+        // TODO
+      }
+      else if (effectNum == 5) { // "Rainbow" effect
+        // TODO
+      }     
+      else if ((effectNum == 6) && (millis() - effectTimer >= BOUNCEDELAY)) { // "Bounce" effect
+        // first set all strips to black
+        for(int s=0; s<NUM_STRIPS; s++){
+          for(int c=0; c<3; c++) {
+            stripMatrix[s][c] = colorMatrix[0][c];
+          }
+        }
+        // Next set the current strip to it's pre-effect color
+        for(int c=0; c<3; c++) {
+        stripMatrix[effectVarTwo][c] = preEffectMatrix[effectVarTwo][c];
+        }
+        // display the color
+        setAllStripColor();
+        leds.show();
+        if (effectVarOne == 0 && effectVarTwo < NUM_STRIPS) { // if going right and not at end
+          effectVarTwo++; // rotate to the right
+        }
+        else if (effectVarOne == 0 && effectVarTwo == NUM_STRIPS) { // if going right and at end
+          effectVarOne = 1; // start going left
+          effectVarTwo--; //rotate to the left
+        }
+        else if (effectVarOne == 1 && effectVarTwo > 0) { // if going left and not at beginning
+          effectVarTwo--; // rotate to the left
+        }
+        else if (effectVarOne == 1 && effectVarTwo == 0) { // if going left and at beginning
+          effectVarOne = 0; // start going right
+          effectVarTwo++; // rotate to the right
+        }
+      } 
   }
 }
