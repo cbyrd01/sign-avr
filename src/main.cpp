@@ -219,7 +219,8 @@ void loop()
       }
       else if ((effectNum == 4)&& (millis() - effectTimer >= ROTATEDELAY)) { // "Rotate" effect
         for(int s=0; s<NUM_STRIPS; s++) {
-           for(int c=0; c<3; c++) {
+           for(int c=0; c<3; c++) { 
+             // set the strip color to preeffect color plus incriment value modulo number of strips
              stripMatrix[s][c] = preEffectMatrix[s+(effectVarOne % NUM_STRIPS)][c];
            }
         }
@@ -227,6 +228,7 @@ void loop()
         setAllStripColor();
         leds.show();
         if (effectVarOne < NUM_STRIPS) {
+          // rotate the LED strip number for next iteration
           effectVarOne++;
         }
         else {
