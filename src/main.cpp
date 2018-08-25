@@ -8,7 +8,6 @@
 #include <Adafruit_NeoPXL8.h>  // Adafruit NeoPXL8 LED library
 
 #define SLAVE_ADDRESS 0x08     // I2C slave address
-
 #define REEDSWITCHPIN 11       // Digitial input pin for sensing when to stop the gear
 #define POWERTAILPIN 12        // Digital output pin which controls the gear
 
@@ -94,7 +93,7 @@ void setStripColor(int stripNumber) {
   // Iterate through all individual pixels on the strip
   for(int p=startPixel; p<startPixel+NUM_PIXELS; p++) {
     // Set the strip to the specified values
-    leds.setPixelColor(p, stripMatrix[stripNumber][0], stripMatrix[stripNumber][0], stripMatrix[stripNumber][0]);
+    leds.setPixelColor(p, stripMatrix[stripNumber][0], stripMatrix[stripNumber][1], stripMatrix[stripNumber][2]);
   }
 }
 
@@ -181,8 +180,7 @@ void loop()
         effectVarTwo = 0;
       }
     }
-        else if (parsedCmd == 9) { // update to gear mode
-
+    else if (parsedCmd == 9) { // update to gear mode
       if (parsedOption == 0) { // stop the gear
         stopGearFlag = 1;
         // Start the failsafe timer
